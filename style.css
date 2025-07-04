@@ -1,0 +1,25 @@
+body {
+  margin: 0;
+  font: 16px system-ui, sans-serif;
+  background: #0d1b2a;
+  color: #e0e1dd;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+#app {
+  width: 90vw;
+  max-width: 1000px;
+}
+
+canvas {
+  width: 100%;
+  height: 420px;
+}
+
+#status {
+  margin: 0 0 1rem;
+  text-align: center;
+}
