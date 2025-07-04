@@ -49,17 +49,6 @@ function demo(){
   render(labels,heights);
 }
 
-async function fetchTide(lat,lon){
-  try{
-    const res=await fetch(`/api/tide?lat=${lat}&lon=${lon}`);
-    const j=await res.json();
-    if(!j.heights)throw new Error('sin datos');
-    const labels=j.heights.map(h=>new Date(h.dt*1000).getHours().toString().padStart(2,'0'));
-    const heights=j.heights.map(h=>(+h.height).toFixed(2));
-    statusEl.textContent='';
-    render(labels,heights);
-  }catch(e){console.error(e);demo();}
-}
 
 async function geocode(name){
   const url=`https://geocoding-api.open-meteo.com/v1/search?format=json&count=1&language=es&name=${encodeURIComponent(name)}`;
