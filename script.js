@@ -1,113 +1,83 @@
-const statusEl = document.getElementById('status');
-const ctx = document.getElementById('tideChart').getContext('2d');
+const statusEl=document.getElementById('status');
+const ctx=document.getElementById('tideChart').getContext('2d');
+const form=document.getElementById('spotForm');
+const input=document.getElementById('spotInput');
 let chart;
 
-// Cross-hair plugin
+/* línea vertical */
 Chart.register({
-  id: 'crosshair',
-  afterDraw(c) {
-    const act = c.tooltip?.getActiveElements?.()[0];
-    if (act) {
-      const x = act.element.x;
-      const { top, bottom } = c.chartArea;
-      const { ctx } = c;
-      ctx.save();
-      ctx.strokeStyle = '#e0e1dd88';
-      ctx.beginPath();
-      ctx.moveTo(x, top);
-      ctx.lineTo(x, bottom);
-      ctx.stroke();
-      ctx.restore();
-    }
+  id:'crosshair',
+  afterDraw(c){
+    const act=c.tooltip?.getActiveElements?.()[0];
+    if(!act)return;
+    const x=act.element.x,{top,bottom}=c.chartArea;
+    c.ctx.save();
+    c.ctx.strokeStyle='#e0e1dd88';
+    c.ctx.beginPath();c.ctx.moveTo(x,top);c.ctx.lineTo(x,bottom);c.ctx.stroke();
+    c.ctx.restore();
   }
 });
 
-function render(labels, heights) {
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        data: heights,
-        borderWidth: 2,
-        tension: 0.4,
-        fill: { target: 'origin', below: '#1b263b55' }
-      }]
-    },
-    options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          intersect: false,
-          mode: 'index',
-          callbacks: {
-            label: c => `${c.raw} m  –  ${c.label}`
-          }
-        }
+function render(labels,heights){
+  if(chart)chart.destroy();
+  chart=new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets:[{data:heights,borderWidth:2,tension:.4,fill:{target:'origin',below:'#1b263b55'}}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{intersect:false,mode:'index',callbacks:{label:c=>`${(+c.raw).toFixed(1)} m | ${c.label}`}}
       },
-      interaction: { intersect: false, mode: 'index' },
-      scales: {
-        x: {
-          ticks: { maxRotation: 0, color: '#e0e1dd' },
-          grid: { color: '#415a77' }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { color: '#e0e1dd' },
-          grid: { color: '#415a77' }
-        }
+      interaction:{intersect:false,mode:'index'},
+      scales:{
+        x:{ticks:{callback:v=>v.toString().padStart(2,'0')+' h',color:'#e0e1dd'},grid:{color:'#415a77'}},
+        y:{position:'right',beginAtZero:true,ticks:{callback:v=>(+v).toFixed(1),color:'#e0e1dd'},grid:{color:'#415a77'}}
       }
     }
   });
 }
 
-function useMock() {
-  const now = Date.now();
-  const labels = [];
-  const heights = [];
-  for (let h = 0; h < 24; h++) {
-    const t = new Date(now + h * 3600 * 1000);
-    labels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    // seno con algo de ruido: solo demo
-    const ht = (Math.sin((h / 24) * Math.PI * 2) + 1) + (Math.random() * 0.2 - 0.1);
-    heights.push(ht.toFixed(2));
+function demo(){
+  const now=Date.now(),labels=[],heights=[];
+  for(let h=0;h<24;h++){
+    const t=new Date(now+h*3600e3);
+    labels.push(t.getHours().toString().padStart(2,'0'));
+    heights.push((Math.sin(h/24*Math.PI*2)+1.05).toFixed(2));
   }
-  statusEl.textContent = 'Demo local por falta de datos';
-  render(labels, heights);
+  statusEl.textContent='Datos demo por falta de API';
+  render(labels,heights);
 }
 
-async function fetchTide(lat, lon) {
-  const key = '31c253d9-3ea0-4bd0-a2d9-004e8ea98221';
-  const url = `https://www.worldtides.info/api/v3?heights&extend=hours&days=1&lat=${lat}&lon=${lon}&key=${key}`;
-  try {
-    const res = await fetch(url);
-    const json = await res.json();
-    if (!json.heights) throw new Error('sin heights');
-    const labels = json.heights.map(h =>
-      new Date(h.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    );
-    const heights = json.heights.map(h => (+h.height).toFixed(2));
-    statusEl.textContent = '';
-    render(labels, heights);
-  } catch (e) {
-    console.error(e);
-    useMock();
-  }
+
+async function geocode(name){
+  const url=`https://geocoding-api.open-meteo.com/v1/search?format=json&count=1&language=es&name=${encodeURIComponent(name)}`;
+  const r=await fetch(url);
+  const j=await r.json();
+  if(j.results?.length)return j.results[0];
+  throw new Error('lugar no encontrado');
 }
 
-function start(lat, lon, label) {
-  statusEl.textContent = label;
-  fetchTide(lat, lon);
+async function goSpot(name){
+  try{
+    statusEl.textContent='Buscando…';
+    const p=await geocode(name);
+    statusEl.textContent=`${p.name}, ${p.country}`;
+    fetchTide(p.latitude,p.longitude);
+  }catch(e){statusEl.textContent='No se encontró el lugar';console.error(e);demo();}
 }
 
-// Geolocalizar
-if (navigator.geolocation) {
+/* geolocaliza al cargar */
+if(navigator.geolocation){
   navigator.geolocation.getCurrentPosition(
-    p => start(p.coords.latitude, p.coords.longitude,
-               `Lat ${p.coords.latitude.toFixed(2)}, Lon ${p.coords.longitude.toFixed(2)}`),
-    () => start(-33.0463, -71.6127, 'Valparaíso por defecto')
+    p=>{statusEl.textContent=`Lat ${p.coords.latitude.toFixed(2)}, Lon ${p.coords.longitude.toFixed(2)}`;fetchTide(p.coords.latitude,p.coords.longitude);},
+    ()=>{statusEl.textContent='Valparaíso por defecto';fetchTide(-33.0463,-71.6127);}
   );
-} else {
-  start(-33.0463, -71.6127, 'Valparaíso por defecto');
+}else{
+  statusEl.textContent='Valparaíso por defecto';
+  fetchTide(-33.0463,-71.6127);
 }
+
+/* eventos */
+form.addEventListener('submit',e=>{e.preventDefault();const n=input.value.trim();if(n)goSpot(n);});
+input.addEventListener('change',()=>{const n=input.value.trim();if(n)goSpot(n);});
