@@ -5,7 +5,7 @@ const input    = document.getElementById('spotInput');
 
 let chart;
 
-// Línea vertical en el hover
+/* línea vertical al pasar el cursor */
 Chart.register({
   id: 'crosshair',
   afterDraw(c) {
@@ -37,20 +37,34 @@ function render(labels, heights) {
       }]
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
           intersect: false,
           mode: 'index',
-          callbacks: { label: c => `${c.raw} m | ${c.label}` }
+          callbacks: {
+            label: c => `${(+c.raw).toFixed(1)} m | ${c.label}`
+          }
         }
       },
       interaction: { intersect: false, mode: 'index' },
       scales: {
-        x: { ticks: { color: '#e0e1dd' }, grid: { color: '#415a77' } },
+        x: {
+          ticks: {
+            callback: v => v.toString().padStart(2, '0') + ' h',
+            color: '#e0e1dd'
+          },
+          grid: { color: '#415a77' }
+        },
         y: {
+          position: 'right',
           beginAtZero: true,
-          ticks: { color: '#e0e1dd' },
+          ticks: {
+            callback: v => (+v).toFixed(1),
+            color: '#e0e1dd'
+          },
           grid: { color: '#415a77' }
         }
       }
@@ -60,11 +74,11 @@ function render(labels, heights) {
 
 function demoFallback() {
   const now = Date.now();
-  const labels = [];
+  const labels  = [];
   const heights = [];
   for (let h = 0; h < 24; h++) {
     const t = new Date(now + h * 3600e3);
-    labels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    labels.push(t.getHours().toString().padStart(2, '0'));
     heights.push((Math.sin(h / 24 * Math.PI * 2) + 1.05).toFixed(2));
   }
   statusEl.textContent = 'Datos demo por falta de API';
@@ -72,14 +86,14 @@ function demoFallback() {
 }
 
 async function fetchTide(lat, lon) {
-  const key = 'TU_API_KEY'; // WorldTides
+  const key = 'TU_API_KEY';   /* WorldTides */
   const url = `https://www.worldtides.info/api/v3?heights&extend=hours&days=1&lat=${lat}&lon=${lon}&key=${key}`;
   try {
     const res = await fetch(url);
     const j   = await res.json();
     if (!j.heights) throw new Error('sin datos');
     const labels  = j.heights.map(h =>
-      new Date(h.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      new Date(h.dt * 1000).getHours().toString().padStart(2, '0')
     );
     const heights = j.heights.map(h => (+h.height).toFixed(2));
     statusEl.textContent = '';
@@ -111,7 +125,7 @@ async function goSpot(name) {
   }
 }
 
-// geolocalizar al arranque
+/* geolocalizar al cargar */
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
     p => {
@@ -128,9 +142,15 @@ if (navigator.geolocation) {
   fetchTide(-33.0463, -71.6127);
 }
 
-// formulario
+/* búsqueda manual */
 form.addEventListener('submit', e => {
   e.preventDefault();
+  const name = input.value.trim();
+  if (name) goSpot(name);
+});
+
+/* dispara al elegir opción del datalist */
+input.addEventListener('change', () => {
   const name = input.value.trim();
   if (name) goSpot(name);
 });
