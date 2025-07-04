@@ -3,13 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tides 24h</title>
+  <title>Tide 24h</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <main id="app">
-    <h1>Tides 24h</h1>
+    <h1>Tide 24h</h1>
+
+    <form id="spotForm">
+      <input id="spotInput" list="presetSpots" placeholder="Busca playa o ciudad…" autocomplete="off">
+      <datalist id="presetSpots">
+        <option value="Curanipe">
+        <option value="Pichilemu">
+        <option value="Uluwatu">
+        <option value="Jeffreys Bay">
+        <option value="Nazare">
+      </datalist>
+      <button type="submit">Ir</button>
+    </form>
+
     <p id="status">Localizando…</p>
     <canvas id="tideChart" height="420"></canvas>
   </main>
