@@ -40,3 +40,9 @@ h1   { margin: .2rem 0 1rem; text-align: center; }
 #status { margin: 0 0 1rem; text-align: center; }
 
 canvas { width: 100%; }
+
+canvas {
+  width: 100%;
+  max-height: 400px;      /* tope absoluto */
+  height: 60vh;           /* responde al alto de la ventana */
+}
