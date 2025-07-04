@@ -78,7 +78,7 @@ function useMock() {
 }
 
 async function fetchTide(lat, lon) {
-  const key = 'TU_API_KEY';
+  const key = '31c253d9-3ea0-4bd0-a2d9-004e8ea98221';
   const url = `https://www.worldtides.info/api/v3?heights&extend=hours&days=1&lat=${lat}&lon=${lon}&key=${key}`;
   try {
     const res = await fetch(url);
