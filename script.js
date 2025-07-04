@@ -2,26 +2,27 @@ const statusEl = document.getElementById('status');
 const ctx = document.getElementById('tideChart').getContext('2d');
 let chart;
 
-// Draw vertical guide
+// Cross-hair plugin
 Chart.register({
-  id: 'guide',
+  id: 'crosshair',
   afterDraw(c) {
-    if (c.tooltip?.getActiveElements()?.length) {
+    const act = c.tooltip?.getActiveElements?.()[0];
+    if (act) {
+      const x = act.element.x;
+      const { top, bottom } = c.chartArea;
       const { ctx } = c;
-      const x = c.tooltip.getActiveElements()[0].element.x;
       ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(x, c.chartArea.top);
-      ctx.lineTo(x, c.chartArea.bottom);
-      ctx.lineWidth = 1;
       ctx.strokeStyle = '#e0e1dd88';
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
       ctx.stroke();
       ctx.restore();
     }
   }
 });
 
-function draw(labels, heights) {
+function render(labels, heights) {
   if (chart) chart.destroy();
   chart = new Chart(ctx, {
     type: 'line',
@@ -30,55 +31,83 @@ function draw(labels, heights) {
       datasets: [{
         data: heights,
         borderWidth: 2,
-        tension: 0.4   // smooth wave
+        tension: 0.4,
+        fill: { target: 'origin', below: '#1b263b55' }
       }]
     },
     options: {
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          intersect: false,
+          mode: 'index',
+          callbacks: {
+            label: c => `${c.raw} m  –  ${c.label}`
+          }
+        }
+      },
       interaction: { intersect: false, mode: 'index' },
       scales: {
-        x: { ticks: { color: '#e0e1dd' }, grid: { color: '#415a77' } },
-        y: { ticks: { color: '#e0e1dd' }, grid: { color: '#415a77' } }
-      },
-      tooltip: {
-        callbacks: { label: c => `${c.raw} m` }
+        x: {
+          ticks: { maxRotation: 0, color: '#e0e1dd' },
+          grid: { color: '#415a77' }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#e0e1dd' },
+          grid: { color: '#415a77' }
+        }
       }
     }
   });
 }
 
-function fetchTide(lat, lon) {
-  const key = 'YOUR_API_KEY';   // replace before pushing live
-  const url = `https://www.worldtides.info/api/v3?heights&lat=${lat}&lon=${lon}&key=${key}`;
-  fetch(url)
-    .then(r => r.json())
-    .then(j => {
-      if (!j.heights) throw new Error('No tide data');
-      const labels = j.heights.map(h => new Date(h.dt * 1000).toLocaleString());
-      const heights = j.heights.map(h => +h.height.toFixed(2));
-      statusEl.textContent = '';
-      draw(labels, heights);
-    })
-    .catch(e => {
-      statusEl.textContent = 'Tide API error';
-      console.error(e);
-    });
+function useMock() {
+  const now = Date.now();
+  const labels = [];
+  const heights = [];
+  for (let h = 0; h < 24; h++) {
+    const t = new Date(now + h * 3600 * 1000);
+    labels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    // seno con algo de ruido: solo demo
+    const ht = (Math.sin((h / 24) * Math.PI * 2) + 1) + (Math.random() * 0.2 - 0.1);
+    heights.push(ht.toFixed(2));
+  }
+  statusEl.textContent = 'Demo local por falta de datos';
+  render(labels, heights);
 }
 
-// Locate user, fallback to Valparaíso if blocked
-if ('geolocation' in navigator) {
+async function fetchTide(lat, lon) {
+  const key = 'TU_API_KEY';
+  const url = `https://www.worldtides.info/api/v3?heights&extend=hours&days=1&lat=${lat}&lon=${lon}&key=${key}`;
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!json.heights) throw new Error('sin heights');
+    const labels = json.heights.map(h =>
+      new Date(h.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    );
+    const heights = json.heights.map(h => (+h.height).toFixed(2));
+    statusEl.textContent = '';
+    render(labels, heights);
+  } catch (e) {
+    console.error(e);
+    useMock();
+  }
+}
+
+function start(lat, lon, label) {
+  statusEl.textContent = label;
+  fetchTide(lat, lon);
+}
+
+// Geolocalizar
+if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
-    p => {
-      const { latitude, longitude } = p.coords;
-      statusEl.textContent = `Lat ${latitude.toFixed(2)}, Lon ${longitude.toFixed(2)}`;
-      fetchTide(latitude, longitude);
-    },
-    () => {
-      statusEl.textContent = 'Using Valparaíso';
-      fetchTide(-33.0463, -71.6127);
-    }
+    p => start(p.coords.latitude, p.coords.longitude,
+               `Lat ${p.coords.latitude.toFixed(2)}, Lon ${p.coords.longitude.toFixed(2)}`),
+    () => start(-33.0463, -71.6127, 'Valparaíso por defecto')
   );
 } else {
-  statusEl.textContent = 'Geolocation unsupported';
-  fetchTide(-33.0463, -71.6127);
+  start(-33.0463, -71.6127, 'Valparaíso por defecto');
 }
